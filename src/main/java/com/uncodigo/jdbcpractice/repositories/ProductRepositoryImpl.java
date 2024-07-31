@@ -1,0 +1,99 @@
+package com.uncodigo.jdbcpractice.repositories;
+
+import com.uncodigo.jdbcpractice.models.Product;
+import com.uncodigo.jdbcpractice.util.ConnectionDB;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ProductRepositoryImpl implements CrudRepository<Product> {
+
+    private Connection getConnection() throws SQLException {
+        return ConnectionDB.getInstance();
+    }
+
+    @Override
+    public Iterable<Product> findAll() {
+
+        List<Product> products = new ArrayList<>();
+
+        try (Statement statement = getConnection().createStatement()) {
+            ResultSet resultSet = statement.executeQuery("SELECT * FROM products");
+
+            while (resultSet.next()) {
+                Product product = createProduct(resultSet);
+                products.add(product);
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return products;
+
+    }
+
+    @Override
+    public Product findById(Long id) {
+        Product product = null;
+
+        try (PreparedStatement statement = getConnection().prepareStatement("SELECT * FROM products WHERE id = ?")) {
+            statement.setLong(1, id);
+            ResultSet resultSet = statement.executeQuery();
+
+            if (resultSet.next()) {
+                product = createProduct(resultSet);
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+
+        }
+
+        return product;
+    }
+
+    @Override
+    public void save(Product product) {
+        String sql;
+        if (product.getId() != null && product.getId() > 0) {
+            sql = "UPDATE products SET name=?, price=? WHERE id=?";
+        } else {
+            sql = "INSERT INTO products(name, price) VALUES(?,?)";
+        }
+
+        try (PreparedStatement statement = getConnection().prepareStatement(sql)) {
+            statement.setString(1, product.getName());
+            statement.setDouble(2, product.getPrice());
+
+            if (product.getId() != null && product.getId() > 0) {
+                statement.setLong(3, product.getId());
+            }
+
+            statement.executeUpdate();
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void delete(Long id) {
+        try (PreparedStatement statement = getConnection().prepareStatement("DELETE FROM products WHERE id = ?")) {
+            statement.setLong(1, id);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Product createProduct(ResultSet resultSet) throws SQLException {
+        Product product = new Product();
+        product.setId(resultSet.getLong("id"));
+        product.setName(resultSet.getString("name"));
+        product.setPrice(resultSet.getDouble("price"));
+        product.setCreatedAt(resultSet.getDate("created_at"));
+        return product;
+    }
+}
